@@ -1,6 +1,4 @@
-A README is basically just a north star doc — it tells anyone (including future you) what the project is, what it does, how it's structured, and what needs to happen next. That's it.
-Let me write it clean and direct right now.
-Choose or Lose
+#So Over So
 A gamified single-page shopping experience. Two products enter, one gets chosen, one disappears. Built to give low-visibility indie merchants a fun, converting way to promote products.
 What It Does
 A user lands on the page and sees two products head-to-head. They pick one. The loser animates out. The winner expands into a checkout flow — all on one screen with layered overlays. No page reloads.
