@@ -1,4 +1,4 @@
-#So Over So
+# So Over So
 A gamified single-page shopping experience. Two products enter, one gets chosen, one disappears. Built to give low-visibility indie merchants a fun, converting way to promote products.
 What It Does
 A user lands on the page and sees two products head-to-head. They pick one. The loser animates out. The winner expands into a checkout flow — all on one screen with layered overlays. No page reloads.
