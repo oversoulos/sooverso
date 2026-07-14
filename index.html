@@ -19,7 +19,7 @@
             position: relative;
         }
         
-        /* CRT scanline overlay (subtle) */
+        /* CRT scanline overlay */
         body::after {
             content: '';
             position: fixed;
@@ -36,12 +36,12 @@
         }
         
         /* ============================================
-           FONTS (Cheap, retro, Gen-X friendly)
+           FONTS
            ============================================ */
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
         
         /* ============================================
-           SPLASH LOGO (Nickelodeon vibes, original)
+           SPLASH LOGO
            ============================================ */
         #splashLogo {
             position: fixed;
@@ -124,7 +124,7 @@
         }
         
         /* ============================================
-           DUEL ARENA (Always visible)
+           DUEL ARENA
            ============================================ */
         .duel-arena {
             padding: 15px;
@@ -139,7 +139,7 @@
             filter: blur(0.5px);
         }
         
-        /* Top bar: profile + rooms */
+        /* Top bar */
         .topbar {
             display: flex;
             justify-content: space-between;
@@ -197,7 +197,7 @@
         }
         
         /* ============================================
-           PRODUCT CARDS (Sticker-shaped, tilting)
+           PRODUCT CARDS (Sticker-shaped)
            ============================================ */
         .duel-container {
             display: grid;
@@ -232,7 +232,6 @@
         .product-card:nth-child(odd) { --tilt: 1.5deg; }
         .product-card:nth-child(even) { --tilt: -1.2deg; }
         
-        /* Comic burst behind product */
         .product-card::before {
             content: '';
             position: absolute;
@@ -320,7 +319,7 @@
         }
         
         /* ============================================
-           CHAT PANEL (Slides in from left)
+           CHAT PANEL
            ============================================ */
         .chat-panel {
             background: rgba(10, 14, 39, 0.97);
@@ -405,7 +404,7 @@
         }
         
         /* ============================================
-           ROOMS DROPDOWN (Overlays duel)
+           ROOMS DROPDOWN
            ============================================ */
         .rooms-dropdown {
             display: none;
@@ -439,7 +438,7 @@
         }
         
         /* ============================================
-           EMPTY STATE (Out of duels)
+           EMPTY STATE
            ============================================ */
         .empty-state {
             display: flex;
@@ -491,7 +490,7 @@
         }
         
         /* ============================================
-           LEADERBOARD TICKER
+           TICKER
            ============================================ */
         .ticker {
             padding: 8px 15px;
@@ -510,7 +509,7 @@
         }
         
         /* ============================================
-           LOGIN FORM (Minimal)
+           LOGIN OVERLAY
            ============================================ */
         .login-overlay {
             display: none;
@@ -606,7 +605,7 @@
         }
         
         /* ============================================
-           GUMBALL MACHINE ANIMATION
+           GUMBALL OVERLAY
            ============================================ */
         .gumball-overlay {
             display: none;
@@ -621,7 +620,6 @@
         
         .gumball-overlay.active {
             display: flex;
-            pointer-events: none;
         }
         
         .gumball {
@@ -636,13 +634,8 @@
             100% { transform: scale(1) rotate(360deg); opacity: 1; }
         }
         
-        @keyframes stickerReveal {
-            0% { transform: scale(0) rotate(-90deg); }
-            100% { transform: scale(1) rotate(0deg); }
-        }
-        
         /* ============================================
-           TORNADO FINISHER (Laggy, zigzag)
+           TORNADO FINISHER
            ============================================ */
         .finisher {
             position: fixed;
@@ -667,7 +660,7 @@
         }
         
         /* ============================================
-           PAYMENT MODAL (Minimal)
+           PAYMENT MODAL
            ============================================ */
         .payment-modal {
             display: none;
@@ -793,7 +786,7 @@
         }
         
         /* ============================================
-           SCROLLBAR STYLING (Retro)
+           SCROLLBAR
            ============================================ */
         ::-webkit-scrollbar {
             width: 8px;
@@ -855,6 +848,7 @@
             }
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.5.3/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -968,4 +962,504 @@
         <div class="payment-box">
             <h2>⚡ 3-click checkout</h2>
             <div class="pay-method" onclick="selectPayment('stripe')">💳 stripe</div>
-            <div class="pay-method" onclick="selectPayment('paypal')">🔵 pay
+            <div class="pay-method" onclick="selectPayment('paypal')">🔵 paypal</div>
+            <div class="pay-method" onclick="selectPayment('crypto')">₿ crypto</div>
+            <div class="pay-method" onclick="selectPayment('tg')">✈️ telegram</div>
+            <div id="qrcode" style="display:none;"></div>
+            <p id="paymentInfo" style="color: #00ff00; margin-top: 20px; display: none;"></p>
+            <button class="close-payment" onclick="closePayment()">close</button>
+        </div>
+    </div>
+
+    <!-- ============================================
+    JAVASCRIPT
+    ============================================ -->
+    <script>
+        // ============================================
+        // DATA
+        // ============================================
+        let currentUser = null;
+        let currentDuel = null;
+        let chatOpen = false;
+        let roomsOpen = false;
+        let userVotes = [];
+        
+        const SAMPLE_DUELS = [
+            { id: 1, prod1: { name: 'Hand-painted D&D Mini', price: '$19.99', merchant: 'ArtByAlex', wins: 234, emoji: '🎨' }, prod2: { name: 'Mold-cast Resin Copy', price: '$24.99', merchant: 'CastCo', wins: 189, emoji: '🗿' } },
+            { id: 2, prod1: { name: '3-Hour Zine About Mushrooms', price: '$99', merchant: 'FungalPress', wins: 156, emoji: '🍄' }, prod2: { name: 'AI-Generated Plant Guide', price: '$79', merchant: 'BotGen', wins: 198, emoji: '🌱' } },
+            { id: 3, prod1: { name: 'Custom Keyboard Cable', price: '$49', merchant: 'CableWitch', wins: 312, emoji: '🔌' }, prod2: { name: 'Mass-Produced USB Cord', price: '$39', merchant: 'BigTech', wins: 267, emoji: '⚡' } },
+            { id: 4, prod1: { name: 'Vintage Denim Jacket', price: '$89', merchant: 'ThriftKing', wins: 98, emoji: '👕' }, prod2: { name: 'Fast Fashion Copy', price: '$59', merchant: 'TrendFast', wins: 76, emoji: '🧥' } },
+            { id: 5, prod1: { name: 'Custom Leather Wallet', price: '$65', merchant: 'HideAndStitch', wins: 145, emoji: '👛' }, prod2: { name: 'Mass-Market Wallet', price: '$35', merchant: 'WalletWorld', wins: 112, emoji: '💳' } }
+        ];
+
+        const gumballStickers = [
+            '⭐', '🌈', '🌀', '🔥', '💀', '👾', '🤖', '👽', 
+            '🦄', '🍕', '🎮', '📼', '📟', '💾', '📠', '☎️',
+            '🌪️', '🚽', '🎯', '💎', '🎲', '🧩', '🎪', '🎭'
+        ];
+
+        const skins = {
+            default: { background: '#0a0e27', accent: '#00ffff', accent2: '#ff00ff', font: 'VT323', borderStyle: 'solid' },
+            retroAim: { background: '#2a2a2a', accent: '#00ff00', accent2: '#ffffff', font: 'Arial', borderStyle: 'ridge' },
+            yahoo: { background: '#1a1a2e', accent: '#ffcc00', accent2: '#ffffff', font: 'Verdana', borderStyle: 'groove' },
+            icq: { background: '#0a0a0a', accent: '#00cc00', accent2: '#ff6600', font: 'Tahoma', borderStyle: 'double' },
+            cyberdeck: { background: '#000000', accent: '#00ff88', accent2: '#ff00ff', font: 'VT323', borderStyle: 'solid' }
+        };
+
+        // ============================================
+        // INIT
+        // ============================================
+        function init() {
+            loadUser();
+            loadDuel();
+            updateTicker();
+            setupSplash();
+        }
+
+        function setupSplash() {
+            setTimeout(() => {
+                const splash = document.getElementById('splashLogo');
+                splash.style.opacity = '0';
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                }, 800);
+            }, 2000);
+        }
+
+        // ============================================
+        // USER
+        // ============================================
+        function loadUser() {
+            const saved = localStorage.getItem('sooverso_user');
+            if (saved) {
+                currentUser = JSON.parse(saved);
+                updateUserDisplay();
+            }
+        }
+
+        function handleLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const email = document.getElementById('loginEmail').value.trim();
+            const userType = document.getElementById('loginType').value;
+
+            if (!username || !email) {
+                showAlert('username and email required', 'error');
+                return;
+            }
+
+            currentUser = {
+                username,
+                email,
+                userType,
+                joinedAt: Date.now(),
+                stickers: [],
+                unlockedSkins: ['default'],
+                seen: [],
+                passed: []
+            };
+
+            localStorage.setItem('sooverso_user', JSON.stringify(currentUser));
+            updateUserDisplay();
+            toggleLogin();
+            showAlert(`welcome, ${username}!`, 'success');
+            playSound('unlock');
+        }
+
+        function toggleLogin() {
+            const overlay = document.getElementById('loginOverlay');
+            overlay.classList.toggle('open');
+        }
+
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('sooverso_user');
+            updateUserDisplay();
+            showAlert('logged out', 'info');
+        }
+
+        function updateUserDisplay() {
+            const display = document.getElementById('usernameDisplay');
+            const avatar = document.getElementById('avatarDisplay');
+            if (currentUser) {
+                display.textContent = currentUser.username;
+                avatar.textContent = '👤';
+            } else {
+                display.textContent = 'guest';
+                avatar.textContent = '👤';
+            }
+        }
+
+        // ============================================
+        // DUEL
+        // ============================================
+        function loadDuel() {
+            const container = document.getElementById('duelContainer');
+            
+            // Check if user has seen all duels
+            if (currentUser && currentUser.seen && currentUser.seen.length >= SAMPLE_DUELS.length) {
+                container.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div class="big-icon">🔄</div>
+                        <h3>you're caught up</h3>
+                        <p>check back tomorrow for fresh duels</p>
+                        <div class="invite-prompt" onclick="showAlert('share this link with friends!', 'info')">
+                            invite a friend to unlock new rooms ✨
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Get unseen duel
+            const available = SAMPLE_DUELS.filter(d => 
+                !currentUser || !currentUser.seen || !currentUser.seen.includes(d.id)
+            );
+
+            if (available.length === 0) {
+                // Rotate passed duels back in
+                if (currentUser && currentUser.passed && currentUser.passed.length > 0) {
+                    const passedDuel = SAMPLE_DUELS.find(d => currentUser.passed.includes(d.id));
+                    if (passedDuel) {
+                        currentUser.passed = currentUser.passed.filter(id => id !== passedDuel.id);
+                        currentDuel = passedDuel;
+                        renderDuel();
+                        return;
+                    }
+                }
+                // If nothing, show empty state
+                container.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div class="big-icon">🔄</div>
+                        <h3>you're caught up</h3>
+                        <p>check back tomorrow for fresh duels</p>
+                    </div>
+                `;
+                return;
+            }
+
+            currentDuel = available[Math.floor(Math.random() * available.length)];
+            renderDuel();
+        }
+
+        function renderDuel() {
+            if (!currentDuel) return;
+            const container = document.getElementById('duelContainer');
+            const { prod1, prod2, id } = currentDuel;
+
+            // Check if user has voted on this duel
+            const hasVoted = userVotes.includes(id);
+
+            container.innerHTML = `
+                <div class="product-card" onclick="voteDuel(1)">
+                    <div class="merchant-badge">${prod1.merchant}</div>
+                    <div class="product-emoji">${prod1.emoji || '🏆'}</div>
+                    <div class="product-name">${prod1.name}</div>
+                    <div class="product-price">${prod1.price}</div>
+                    <div class="product-desc">wins: <strong>${prod1.wins}</strong></div>
+                    <button class="vote-btn" ${hasVoted ? 'disabled' : ''}>
+                        ${hasVoted ? 'voted!' : 'pick this'}
+                    </button>
+                </div>
+                <div class="product-card" onclick="voteDuel(2)">
+                    <div class="merchant-badge">${prod2.merchant}</div>
+                    <div class="product-emoji">${prod2.emoji || '⚡'}</div>
+                    <div class="product-name">${prod2.name}</div>
+                    <div class="product-price">${prod2.price}</div>
+                    <div class="product-desc">wins: <strong>${prod2.wins}</strong></div>
+                    <button class="vote-btn" ${hasVoted ? 'disabled' : ''}>
+                        ${hasVoted ? 'voted!' : 'pick this'}
+                    </button>
+                </div>
+            `;
+        }
+
+        function voteDuel(productNum) {
+            if (!currentUser) {
+                showAlert('login to vote', 'info');
+                return;
+            }
+
+            const duelId = currentDuel.id;
+            if (userVotes.includes(duelId)) {
+                showAlert('you already voted on this duel', 'info');
+                return;
+            }
+
+            const winner = productNum === 1 ? currentDuel.prod1 : currentDuel.prod2;
+            currentDuel[`prod${productNum}`].wins += 1;
+            userVotes.push(duelId);
+
+            // Mark as seen
+            if (!currentUser.seen) currentUser.seen = [];
+            if (!currentUser.seen.includes(duelId)) {
+                currentUser.seen.push(duelId);
+            }
+
+            localStorage.setItem('sooverso_user', JSON.stringify(currentUser));
+
+            playSound('vote');
+            showAlert(`you picked ${winner.name}!`, 'success');
+            
+            // Show finisher sticker
+            playFinisher(winner.emoji || '🏆');
+            
+            // Maybe award a sticker
+            if (Math.random() < 0.2) {
+                setTimeout(() => getGumballSticker(), 500);
+            }
+
+            // Open payment after vote
+            setTimeout(() => {
+                openPayment();
+            }, 300);
+
+            setTimeout(() => {
+                loadDuel();
+                updateTicker();
+            }, 2000);
+        }
+
+        // ============================================
+        // FINISHER ANIMATIONS
+        // ============================================
+        function playFinisher(emoji) {
+            const el = document.createElement('div');
+            el.className = 'finisher';
+            el.textContent = emoji || '🌪️';
+            el.style.animation = 'tornadoSlide 2.5s steps(12) forwards';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 2800);
+        }
+
+        function flushLoser(emoji) {
+            const el = document.createElement('div');
+            el.className = 'finisher';
+            el.textContent = emoji || '🚽';
+            el.style.animation = 'flushDown 1.5s ease-in forwards';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1800);
+        }
+
+        // ============================================
+        // GUMBALL MACHINE
+        // ============================================
+        function getGumballSticker() {
+            const sticker = gumballStickers[Math.floor(Math.random() * gumballStickers.length)];
+            if (currentUser) {
+                if (!currentUser.stickers) currentUser.stickers = [];
+                currentUser.stickers.push(sticker);
+                localStorage.setItem('sooverso_user', JSON.stringify(currentUser));
+            }
+            showGumballAnimation(sticker);
+            playSound('unlock');
+        }
+
+        function showGumballAnimation(sticker) {
+            const overlay = document.getElementById('gumballOverlay');
+            const display = document.getElementById('gumballDisplay');
+            
+            overlay.classList.add('active');
+            display.textContent = '🟠';
+            display.style.animation = 'gumballDrop 1.8s ease forwards';
+            
+            setTimeout(() => {
+                display.textContent = sticker;
+                display.style.animation = 'none';
+                display.style.transform = 'scale(1) rotate(0deg)';
+            }, 1500);
+            
+            setTimeout(() => {
+                overlay.classList.remove('active');
+                showAlert(`🎉 you got a sticker: ${sticker}`, 'success');
+            }, 2500);
+        }
+
+        // ============================================
+        // CHAT
+        // ============================================
+        function toggleChat() {
+            chatOpen = !chatOpen;
+            const app = document.getElementById('app');
+            const panel = document.getElementById('chatPanel');
+            const arena = document.getElementById('duelArena');
+            
+            app.classList.toggle('chat-open');
+            panel.classList.toggle('open');
+            arena.classList.toggle('chat-open');
+            
+            document.getElementById('chatToggle').textContent = chatOpen ? '✕' : 'chat';
+            
+            if (chatOpen) {
+                document.getElementById('chatInput').focus();
+            }
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+            
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = 'chat-message';
+            const username = currentUser ? currentUser.username : 'guest';
+            div.innerHTML = `<span class="msg-user">${username}:</span> ${msg}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            input.value = '';
+            
+            playSound('chat');
+        }
+
+        // ============================================
+        // ROOMS
+        // ============================================
+        function toggleRooms() {
+            roomsOpen = !roomsOpen;
+            document.getElementById('roomsDropdown').classList.toggle('open');
+        }
+
+        function joinRoom(roomName) {
+            toggleRooms();
+            showAlert(`joined #${roomName}`, 'info');
+            // Add room to chat
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = 'chat-message';
+            div.innerHTML = `<span class="msg-user">system:</span> joined #${roomName}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            
+            if (!chatOpen) toggleChat();
+        }
+
+        // ============================================
+        // PAYMENT
+        // ============================================
+        function openPayment() {
+            document.getElementById('paymentModal').classList.add('open');
+        }
+
+        function closePayment() {
+            document.getElementById('paymentModal').classList.remove('open');
+            document.getElementById('qrcode').innerHTML = '';
+            document.getElementById('qrcode').style.display = 'none';
+            document.getElementById('paymentInfo').style.display = 'none';
+            document.querySelectorAll('.pay-method').forEach(m => m.classList.remove('active'));
+        }
+
+        function selectPayment(method) {
+            document.querySelectorAll('.pay-method').forEach(m => m.classList.remove('active'));
+            event.target.closest('.pay-method').classList.add('active');
+            
+            const qrcodeDiv = document.getElementById('qrcode');
+            qrcodeDiv.innerHTML = '';
+            qrcodeDiv.style.display = 'block';
+            
+            const paymentUrls = {
+                stripe: 'https://stripe.com/pay/sooverso',
+                paypal: 'https://paypal.me/sooverso',
+                crypto: 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq',
+                tg: 'https://t.me/sooverso_bot?start=payment'
+            };
+            
+            try {
+                new QRCode(qrcodeDiv, {
+                    text: paymentUrls[method],
+                    width: 200,
+                    height: 200,
+                    colorDark: '#00ffff',
+                    colorLight: '#1a1f3a'
+                });
+            } catch(e) {
+                qrcodeDiv.innerHTML = `<p style="color:#ff00ff;font-size:0.8rem;">QR: ${paymentUrls[method]}</p>`;
+            }
+            
+            document.getElementById('paymentInfo').style.display = 'block';
+            document.getElementById('paymentInfo').textContent = `scan to pay via ${method.toUpperCase()}`;
+        }
+
+        // ============================================
+        // TICKER
+        // ============================================
+        function updateTicker() {
+            const sorted = [...SAMPLE_DUELS].sort((a, b) => b.prod1.wins - a.prod1.wins);
+            const top3 = sorted.slice(0, 3);
+            const ticker = document.querySelector('.ticker marquee');
+            if (ticker) {
+                ticker.textContent = `🏆 ${top3.map((d, i) => `#${i+1} ${d.prod1.name} (${d.prod1.wins} wins)`).join(' • ')} • so overso • `;
+            }
+        }
+
+        // ============================================
+        // ALERTS
+        // ============================================
+        function showAlert(msg, type) {
+            const container = document.getElementById('alerts');
+            const alert = document.createElement('div');
+            alert.className = `alert ${type}`;
+            alert.textContent = msg;
+            container.appendChild(alert);
+            setTimeout(() => {
+                alert.style.opacity = '0';
+                alert.style.transition = 'opacity 0.5s';
+                setTimeout(() => alert.remove(), 500);
+            }, 3000);
+        }
+
+        // ============================================
+        // SOUND
+        // ============================================
+        function playSound(type) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                
+                switch(type) {
+                    case 'vote':
+                        osc.frequency.value = 880;
+                        gain.gain.value = 0.08;
+                        osc.start();
+                        setTimeout(() => osc.stop(), 100);
+                        break;
+                    case 'unlock':
+                        osc.frequency.value = 523;
+                        gain.gain.value = 0.08;
+                        osc.start();
+                        setTimeout(() => { osc.frequency.value = 659; }, 150);
+                        setTimeout(() => { osc.frequency.value = 784; }, 300);
+                        setTimeout(() => osc.stop(), 450);
+                        break;
+                    case 'chat':
+                        osc.frequency.value = 440;
+                        gain.gain.value = 0.04;
+                        osc.start();
+                        setTimeout(() => osc.stop(), 50);
+                        break;
+                }
+            } catch(e) {
+                // Audio not available, silently fail
+            }
+        }
+
+        // ============================================
+        // SKIN SYSTEM (placeholder for now)
+        // ============================================
+        function applySkin(skinName) {
+            const skin = skins[skinName] || skins.default;
+            // Apply skin to body
+            document.body.style.background = skin.background;
+            // More skin application logic would go here
+            showAlert(`skin applied: ${skinName}`, 'info');
+        }
+
+        // ============================================
+        // START
+        // ============================================
+        init();
+    </script>
+</body>
+</html>
