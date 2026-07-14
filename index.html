@@ -1,592 +1,973 @@
+```
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>So Over So - Indie Product Duels</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.5.3/qrcode.min.js"></script>
+    <title>so overso</title>
     <style>
+        /* ============================================
+           RESET & BASE
+           ============================================ */
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
             background: #0a0e27;
             color: #e0e0ff;
             font-family: 'Courier New', monospace;
             overflow-x: hidden;
+            min-height: 100vh;
+            position: relative;
         }
         
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        .header {
-            border: 3px solid #00ffff;
-            padding: 20px;
-            margin-bottom: 20px;
-            background: linear-gradient(135deg, #1a1f3a 0%, #0f1428 100%);
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        /* CRT scanline overlay (subtle) */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0,0,0,0) 0px,
+                rgba(0,0,0,0.03) 2px,
+                rgba(0,0,0,0) 4px
+            );
+            pointer-events: none;
+            z-index: 9999;
         }
-        .header h1 {
-            color: #00ffff;
-            text-shadow: 0 0 10px #00ffff;
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-        .header p { color: #ff00ff; font-size: 0.9em; }
         
-        .nav {
+        /* ============================================
+           FONTS (Cheap, retro, Gen-X friendly)
+           ============================================ */
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+        
+        /* ============================================
+           SPLASH LOGO (Nickelodeon vibes, original)
+           ============================================ */
+        #splashLogo {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #0a0e27;
             display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #ff00ff;
-            padding-bottom: 10px;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            transition: opacity 0.8s ease;
+            pointer-events: none;
         }
-        .nav button {
-            background: #1a1f3a;
-            color: #00ffff;
-            border: 2px solid #00ffff;
-            padding: 10px 20px;
+        
+        #splashLogo .logo-text {
+            font-family: 'Press Start 2P', 'Comic Sans MS', cursive;
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #ff00ff, #00ffff, #ff6600, #ff00ff);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: logoWiggle 2s ease-in-out infinite, logoShift 3s linear infinite;
+            text-shadow: 0 0 60px rgba(255,0,255,0.3);
+            transform: rotate(-2deg) scale(0.9);
+            padding: 30px 50px;
+            position: relative;
+        }
+        
+        #splashLogo .logo-text::before {
+            content: '';
+            position: absolute;
+            top: -10px; left: -10px;
+            right: -10px; bottom: -10px;
+            background: radial-gradient(circle at 30% 40%, 
+                rgba(255,0,255,0.15), 
+                rgba(0,255,255,0.05) 70%, 
+                transparent
+            );
+            clip-path: polygon(
+                50% 0%, 61% 35%, 98% 35%, 
+                68% 57%, 79% 91%, 50% 70%, 
+                21% 91%, 32% 57%, 2% 35%, 
+                39% 35%
+            );
+            z-index: -1;
+            animation: splatPulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes logoWiggle {
+            0%, 100% { transform: rotate(-2deg) scale(0.9); }
+            50% { transform: rotate(2deg) scale(1.05); }
+        }
+        
+        @keyframes logoShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        @keyframes splatPulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* ============================================
+           APP LAYOUT
+           ============================================ */
+        .app {
+            display: grid;
+            grid-template-columns: 1fr 0fr;
+            transition: grid-template-columns 0.3s ease;
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .app.chat-open {
+            grid-template-columns: 0.45fr 0.55fr;
+        }
+        
+        /* ============================================
+           DUEL ARENA (Always visible)
+           ============================================ */
+        .duel-arena {
+            padding: 15px;
+            overflow-y: auto;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .duel-arena.chat-open {
+            opacity: 0.6;
+            filter: blur(0.5px);
+        }
+        
+        /* Top bar: profile + rooms */
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+        
+        .profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
             cursor: pointer;
-            font-family: 'Courier New', monospace;
-            transition: all 0.3s;
-        }
-        .nav button:hover, .nav button.active {
-            background: #00ffff;
-            color: #0a0e27;
-            box-shadow: 0 0 15px #00ffff;
         }
         
-        .screen { display: none; }
-        .screen.active { display: block; animation: fadeIn 0.3s; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .profile .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            background: #1a1f3a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
         
+        .profile .username {
+            font-family: 'VT323', monospace;
+            font-size: 1.1rem;
+            color: #00ffff;
+        }
+        
+        .room-controls {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .room-controls button {
+            background: transparent;
+            border: 1px solid rgba(255, 0, 255, 0.2);
+            color: #ff00ff;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-family: 'VT323', monospace;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        
+        .room-controls button:hover {
+            background: rgba(255, 0, 255, 0.1);
+            border-color: #ff00ff;
+        }
+        
+        /* ============================================
+           PRODUCT CARDS (Sticker-shaped, tilting)
+           ============================================ */
         .duel-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 40px;
+            gap: 20px;
+            flex: 1;
+            align-content: center;
         }
+        
         .product-card {
-            border: 3px solid #00ffff;
+            clip-path: polygon(
+                0% 5%, 5% 0%, 95% 0%, 100% 5%,
+                100% 95%, 95% 100%, 5% 100%, 0% 95%
+            );
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            background: rgba(26, 31, 58, 0.7);
+            backdrop-filter: blur(4px);
             padding: 20px;
-            background: #1a1f3a;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
             position: relative;
-            overflow: hidden;
+            transform: rotate(var(--tilt, -1deg));
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.03);
         }
+        
         .product-card:hover {
-            border-color: #ff00ff;
-            box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
-            transform: scale(1.02);
+            transform: rotate(0deg) scale(1.02);
+            border-color: rgba(255, 0, 255, 0.4);
+            box-shadow: 0 0 40px rgba(255, 0, 255, 0.08);
         }
-        .product-card.voted {
-            background: linear-gradient(135deg, rgba(0, 255, 255, 0.2), rgba(255, 0, 255, 0.2));
-            border-color: #00ff00;
+        
+        .product-card:nth-child(odd) { --tilt: 1.5deg; }
+        .product-card:nth-child(even) { --tilt: -1.2deg; }
+        
+        /* Comic burst behind product */
+        .product-card::before {
+            content: '';
+            position: absolute;
+            top: -8px; left: -8px;
+            right: -8px; bottom: -8px;
+            background: radial-gradient(circle at 30% 40%, 
+                rgba(255,0,255,0.06), 
+                rgba(0,255,255,0.02) 70%, 
+                transparent
+            );
+            clip-path: polygon(
+                50% 0%, 61% 35%, 98% 35%, 
+                68% 57%, 79% 91%, 50% 70%, 
+                21% 91%, 32% 57%, 2% 35%, 
+                39% 35%
+            );
+            z-index: -1;
+            opacity: 0.4;
         }
-        .product-img {
-            width: 100%;
-            height: 250px;
-            background: #0f1428;
-            border: 2px solid #ff00ff;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #ff00ff;
-            font-size: 3em;
-        }
-        .product-name { font-size: 1.5em; color: #00ffff; margin-bottom: 10px; }
-        .product-price { color: #00ff00; font-size: 1.8em; margin-bottom: 15px; }
-        .product-desc { color: #b0b0ff; font-size: 0.9em; margin-bottom: 15px; line-height: 1.5; }
-        .merchant-badge {
+        
+        .product-card .merchant-badge {
             display: inline-block;
-            background: #ff00ff;
-            color: #0a0e27;
-            padding: 5px 10px;
-            font-size: 0.8em;
+            background: rgba(255, 0, 255, 0.15);
+            color: #ff00ff;
+            padding: 3px 12px;
+            font-size: 0.7rem;
+            font-family: 'VT323', monospace;
             margin-bottom: 10px;
+            border: 1px solid rgba(255, 0, 255, 0.1);
         }
-        .vote-btn {
+        
+        .product-card .product-emoji {
+            font-size: 3rem;
+            text-align: center;
+            padding: 15px 0;
+            filter: drop-shadow(0 0 20px rgba(0,255,255,0.1));
+        }
+        
+        .product-card .product-name {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.8rem;
+            color: #00ffff;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+        
+        .product-card .product-price {
+            font-family: 'VT323', monospace;
+            font-size: 1.8rem;
+            color: #00ff00;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(0,255,0,0.1);
+        }
+        
+        .product-card .product-desc {
+            color: #b0b0ff;
+            font-size: 0.8rem;
+            font-family: 'VT323', monospace;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+        
+        .product-card .vote-btn {
             width: 100%;
-            padding: 15px;
-            background: #00ff00;
-            color: #0a0e27;
-            border: none;
-            font-weight: bold;
+            padding: 12px;
+            background: rgba(0, 255, 0, 0.1);
+            color: #00ff00;
+            border: 1px solid rgba(0, 255, 0, 0.2);
             cursor: pointer;
-            font-size: 1.1em;
+            font-family: 'VT323', monospace;
+            font-size: 1.1rem;
             transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
-        .vote-btn:hover {
-            background: #00ffff;
-            box-shadow: 0 0 15px #00ff00;
+        
+        .product-card .vote-btn:hover {
+            background: rgba(0, 255, 0, 0.2);
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.05);
         }
-        .vote-btn:disabled {
-            background: #555;
+        
+        .product-card .vote-btn:disabled {
+            opacity: 0.3;
             cursor: not-allowed;
         }
         
-        .login-form {
-            border: 3px solid #00ffff;
-            padding: 40px;
-            max-width: 500px;
-            margin: 50px auto;
-            background: #1a1f3a;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        .form-group label {
-            display: block;
-            color: #00ffff;
-            margin-bottom: 8px;
-            font-weight: bold;
-        }
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 10px;
-            background: #0f1428;
-            border: 2px solid #ff00ff;
-            color: #00ffff;
-            font-family: 'Courier New', monospace;
-        }
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: #00ff00;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
-        }
-        .login-btn {
-            width: 100%;
-            padding: 15px;
-            background: #00ff00;
-            color: #0a0e27;
-            border: none;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 1.1em;
-            transition: all 0.3s;
-        }
-        .login-btn:hover {
-            background: #00ffff;
-            box-shadow: 0 0 15px #00ff00;
+        /* ============================================
+           CHAT PANEL (Slides in from left)
+           ============================================ */
+        .chat-panel {
+            background: rgba(10, 14, 39, 0.97);
+            border-left: 1px solid rgba(0, 255, 255, 0.08);
+            padding: 20px;
+            overflow-y: auto;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
         }
         
-        .dashboard {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
+        .chat-panel.open {
+            transform: translateX(0);
         }
-        .stat-box {
-            border: 2px solid #ff00ff;
-            padding: 20px;
-            background: #1a1f3a;
+        
+        .chat-panel .chat-header {
+            font-family: 'VT323', monospace;
+            font-size: 1.2rem;
+            color: #ff00ff;
+            border-bottom: 1px solid rgba(255, 0, 255, 0.1);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+        
+        .chat-panel .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+        
+        .chat-panel .chat-message {
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            background: rgba(26, 31, 58, 0.5);
+            border-left: 2px solid rgba(0, 255, 255, 0.1);
+            font-family: 'VT323', monospace;
+            font-size: 0.95rem;
+            color: #b0b0ff;
+        }
+        
+        .chat-panel .chat-message .msg-user {
+            color: #00ffff;
+            font-weight: bold;
+        }
+        
+        .chat-panel .chat-input {
+            display: flex;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        
+        .chat-panel .chat-input input {
+            flex: 1;
+            padding: 10px 14px;
+            background: rgba(26, 31, 58, 0.8);
+            border: 1px solid rgba(0, 255, 255, 0.1);
+            color: #e0e0ff;
+            font-family: 'VT323', monospace;
+            font-size: 1rem;
+        }
+        
+        .chat-panel .chat-input input:focus {
+            outline: none;
+            border-color: rgba(255, 0, 255, 0.3);
+        }
+        
+        .chat-panel .chat-input button {
+            padding: 10px 20px;
+            background: rgba(255, 0, 255, 0.1);
+            border: 1px solid rgba(255, 0, 255, 0.2);
+            color: #ff00ff;
+            cursor: pointer;
+            font-family: 'VT323', monospace;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        
+        .chat-panel .chat-input button:hover {
+            background: rgba(255, 0, 255, 0.2);
+        }
+        
+        /* ============================================
+           ROOMS DROPDOWN (Overlays duel)
+           ============================================ */
+        .rooms-dropdown {
+            display: none;
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            background: rgba(10, 14, 39, 0.98);
+            border: 1px solid rgba(0, 255, 255, 0.1);
+            padding: 15px;
+            min-width: 200px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+        
+        .rooms-dropdown.open {
+            display: block;
+        }
+        
+        .rooms-dropdown .room-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: 'VT323', monospace;
+            color: #b0b0ff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            transition: all 0.2s;
+        }
+        
+        .rooms-dropdown .room-item:hover {
+            background: rgba(0, 255, 255, 0.05);
+            color: #00ffff;
+        }
+        
+        /* ============================================
+           EMPTY STATE (Out of duels)
+           ============================================ */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .empty-state .big-icon {
+            font-size: 5rem;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .empty-state h3 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1.2rem;
+            color: #ff00ff;
+            margin-bottom: 10px;
+        }
+        
+        .empty-state p {
+            font-family: 'VT323', monospace;
+            font-size: 1.1rem;
+            color: #b0b0ff;
+            margin-bottom: 5px;
+        }
+        
+        .empty-state .invite-prompt {
+            margin-top: 20px;
+            padding: 15px 30px;
+            border: 1px dashed rgba(255, 0, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'VT323', monospace;
+            color: #ff00ff;
+        }
+        
+        .empty-state .invite-prompt:hover {
+            background: rgba(255, 0, 255, 0.05);
+        }
+        
+        /* ============================================
+           LEADERBOARD TICKER
+           ============================================ */
+        .ticker {
+            padding: 8px 15px;
+            border-top: 1px solid rgba(0, 255, 255, 0.05);
+            font-family: 'VT323', monospace;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.3);
+            overflow: hidden;
+            white-space: nowrap;
+            flex-shrink: 0;
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        .ticker marquee {
+            display: block;
+        }
+        
+        /* ============================================
+           LOGIN FORM (Minimal)
+           ============================================ */
+        .login-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(10, 14, 39, 0.95);
+            z-index: 9998;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .login-overlay.open {
+            display: flex;
+        }
+        
+        .login-box {
+            background: rgba(26, 31, 58, 0.9);
+            border: 1px solid rgba(0, 255, 255, 0.1);
+            padding: 40px;
+            max-width: 400px;
+            width: 90%;
+            backdrop-filter: blur(10px);
+        }
+        
+        .login-box h2 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1.2rem;
+            color: #00ffff;
+            margin-bottom: 25px;
             text-align: center;
         }
-        .stat-number { font-size: 2.5em; color: #00ff00; margin-bottom: 10px; }
-        .stat-label { color: #ff00ff; }
         
+        .login-box .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .login-box .form-group label {
+            display: block;
+            font-family: 'VT323', monospace;
+            color: #ff00ff;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        
+        .login-box .form-group input,
+        .login-box .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(10, 14, 39, 0.8);
+            border: 1px solid rgba(0, 255, 255, 0.1);
+            color: #e0e0ff;
+            font-family: 'VT323', monospace;
+            font-size: 1rem;
+        }
+        
+        .login-box .form-group input:focus,
+        .login-box .form-group select:focus {
+            outline: none;
+            border-color: rgba(255, 0, 255, 0.3);
+        }
+        
+        .login-box .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+            cursor: pointer;
+            font-family: 'VT323', monospace;
+            font-size: 1.2rem;
+            transition: all 0.3s;
+            margin-top: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .login-box .login-btn:hover {
+            background: rgba(0, 255, 0, 0.2);
+        }
+        
+        .login-box .close-login {
+            margin-top: 15px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            font-family: 'VT323', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .login-box .close-login:hover {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        /* ============================================
+           GUMBALL MACHINE ANIMATION
+           ============================================ */
+        .gumball-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 99999;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+        
+        .gumball-overlay.active {
+            display: flex;
+            pointer-events: none;
+        }
+        
+        .gumball {
+            font-size: 8rem;
+            animation: gumballDrop 1.8s ease forwards;
+        }
+        
+        @keyframes gumballDrop {
+            0% { transform: scale(0) rotate(0deg); opacity: 0; }
+            40% { transform: scale(1.8) rotate(180deg); opacity: 1; }
+            70% { transform: scale(0.8) rotate(270deg); opacity: 1; }
+            100% { transform: scale(1) rotate(360deg); opacity: 1; }
+        }
+        
+        @keyframes stickerReveal {
+            0% { transform: scale(0) rotate(-90deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+        
+        /* ============================================
+           TORNADO FINISHER (Laggy, zigzag)
+           ============================================ */
+        .finisher {
+            position: fixed;
+            font-size: 5rem;
+            pointer-events: none;
+            z-index: 9998;
+            image-rendering: pixelated;
+        }
+        
+        @keyframes tornadoSlide {
+            0% { top: 20%; left: -10%; transform: rotate(0deg) scale(1); opacity: 1; }
+            20% { top: 35%; left: 20%; transform: rotate(60deg) scale(1.3); opacity: 1; }
+            40% { top: 15%; left: 45%; transform: rotate(120deg) scale(0.8); opacity: 1; }
+            60% { top: 50%; left: 60%; transform: rotate(180deg) scale(1.6); opacity: 1; }
+            80% { top: 30%; left: 80%; transform: rotate(240deg) scale(0.9); opacity: 1; }
+            100% { top: 60%; left: 110%; transform: rotate(360deg) scale(1); opacity: 0; }
+        }
+        
+        @keyframes flushDown {
+            0% { top: -10%; left: 50%; transform: rotate(0deg) scale(1); opacity: 1; }
+            100% { top: 110%; left: 30%; transform: rotate(720deg) scale(0.3); opacity: 0; }
+        }
+        
+        /* ============================================
+           PAYMENT MODAL (Minimal)
+           ============================================ */
         .payment-modal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            z-index: 1000;
-            justify-content: center;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(10, 14, 39, 0.95);
+            z-index: 9997;
             align-items: center;
-            border: 3px solid #00ffff;
-        }
-        .payment-modal.active { display: flex; }
-        .payment-content {
-            background: #1a1f3a;
-            border: 3px solid #ff00ff;
-            padding: 40px;
-            text-align: center;
-            max-width: 400px;
-        }
-        .payment-content h2 { color: #00ffff; margin-bottom: 20px; }
-        .payment-method {
-            margin: 20px 0;
-            padding: 15px;
-            border: 2px solid #00ffff;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .payment-method:hover {
-            background: rgba(0, 255, 255, 0.1);
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
-        }
-        .payment-method.active {
-            background: rgba(0, 255, 0, 0.2);
-            border-color: #00ff00;
-        }
-        #qrcode { margin: 20px auto; }
-        #qrcode canvas { border: 2px solid #ff00ff; }
-        .close-payment {
-            background: #ff0000;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            cursor: pointer;
-            margin-top: 20px;
+            justify-content: center;
         }
         
-        .leaderboard-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
+        .payment-modal.open {
+            display: flex;
         }
-        .leaderboard-table th {
-            background: #1a1f3a;
+        
+        .payment-box {
+            background: rgba(26, 31, 58, 0.95);
+            border: 1px solid rgba(0, 255, 255, 0.1);
+            padding: 40px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+        
+        .payment-box h2 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1rem;
             color: #00ffff;
-            border: 2px solid #ff00ff;
-            padding: 15px;
-            text-align: left;
+            margin-bottom: 20px;
         }
-        .leaderboard-table td {
-            border: 1px solid #ff00ff;
+        
+        .payment-box .pay-method {
             padding: 12px;
-            background: #0f1428;
+            margin: 8px 0;
+            border: 1px solid rgba(0, 255, 255, 0.1);
+            cursor: pointer;
+            font-family: 'VT323', monospace;
+            font-size: 1.1rem;
+            color: #b0b0ff;
+            transition: all 0.2s;
         }
-        .leaderboard-table tr:hover {
-            background: rgba(0, 255, 255, 0.1);
+        
+        .payment-box .pay-method:hover {
+            background: rgba(0, 255, 255, 0.05);
+            border-color: rgba(255, 0, 255, 0.2);
         }
-        .rank-badge {
-            background: #ff00ff;
-            color: #0a0e27;
-            padding: 5px 10px;
-            border-radius: 50%;
-            font-weight: bold;
+        
+        .payment-box .pay-method.active {
+            background: rgba(0, 255, 0, 0.05);
+            border-color: rgba(0, 255, 0, 0.2);
+        }
+        
+        .payment-box #qrcode {
+            margin: 20px auto;
+        }
+        
+        .payment-box #qrcode canvas {
+            border: 1px solid rgba(255, 0, 255, 0.1);
+        }
+        
+        .payment-box .close-payment {
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid rgba(255, 0, 0, 0.1);
+            color: rgba(255, 100, 100, 0.5);
+            cursor: pointer;
+            font-family: 'VT323', monospace;
+            transition: all 0.2s;
+        }
+        
+        .payment-box .close-payment:hover {
+            background: rgba(255, 0, 0, 0.15);
+        }
+        
+        /* ============================================
+           ALERTS
+           ============================================ */
+        #alerts {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9996;
+            width: 90%;
+            max-width: 500px;
+            pointer-events: none;
         }
         
         .alert {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-left: 4px solid;
-            background: rgba(0, 0, 0, 0.5);
+            padding: 12px 20px;
+            margin-bottom: 8px;
+            border: 1px solid;
+            font-family: 'VT323', monospace;
+            font-size: 1rem;
+            animation: alertSlide 0.3s ease;
+            pointer-events: auto;
+            text-align: center;
         }
-        .alert.success { border-color: #00ff00; color: #00ff00; }
-        .alert.error { border-color: #ff0000; color: #ff6666; }
-        .alert.info { border-color: #00ffff; color: #00ffff; }
+        
+        .alert.success {
+            border-color: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+            background: rgba(0, 255, 0, 0.05);
+        }
+        
+        .alert.error {
+            border-color: rgba(255, 0, 0, 0.2);
+            color: #ff6666;
+            background: rgba(255, 0, 0, 0.05);
+        }
+        
+        .alert.info {
+            border-color: rgba(0, 255, 255, 0.2);
+            color: #00ffff;
+            background: rgba(0, 255, 255, 0.05);
+        }
+        
+        @keyframes alertSlide {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* ============================================
+           SCROLLBAR STYLING (Retro)
+           ============================================ */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(10, 14, 39, 0.5);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 0, 255, 0.1);
+            border: 1px solid rgba(255, 0, 255, 0.05);
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 0, 255, 0.2);
+        }
+        
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        @media (max-width: 768px) {
+            .app.chat-open {
+                grid-template-columns: 1fr;
+            }
+            
+            .chat-panel {
+                position: fixed;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
+                transform: translateX(100%);
+                z-index: 9995;
+            }
+            
+            .chat-panel.open {
+                transform: translateX(0);
+            }
+            
+            .duel-container {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            #splashLogo .logo-text {
+                font-size: 2.5rem;
+                padding: 20px 30px;
+            }
+            
+            .topbar {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            
+            .rooms-dropdown {
+                right: 10px;
+                top: 50px;
+                min-width: 150px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>⚔️ SO OVER SO</h1>
-            <p>Two products enter. One gets seen. You decide.</p>
-            <p id="userGreeting" style="margin-top: 10px; color: #00ff00;"></p>
-        </div>
 
-        <div class="nav">
-            <button class="nav-btn active" data-screen="duel">DUEL</button>
-            <button class="nav-btn" data-screen="leaderboard">LEADERBOARD</button>
-            <button class="nav-btn" data-screen="merchant">MERCHANT</button>
-            <button class="nav-btn" data-screen="login">LOGIN</button>
-            <button class="nav-btn" onclick="logout()" style="margin-left: auto;">LOGOUT</button>
-        </div>
+    <!-- ============================================
+    SPLASH LOGO
+    ============================================ -->
+    <div id="splashLogo">
+        <div class="logo-text">so overso</div>
+    </div>
 
-        <div id="duel" class="screen active">
-            <div id="alerts"></div>
-            <div class="duel-container" id="duelContainer"></div>
-            <div style="text-align: center; color: #ff00ff;">
-                <small>Reload to get a new duel • Your vote counts toward merchant visibility</small>
+    <!-- ============================================
+    GUMBALL OVERLAY
+    ============================================ -->
+    <div class="gumball-overlay" id="gumballOverlay">
+        <div class="gumball" id="gumballDisplay">🟠</div>
+    </div>
+
+    <!-- ============================================
+    ALERTS
+    ============================================ -->
+    <div id="alerts"></div>
+
+    <!-- ============================================
+    MAIN APP
+    ============================================ -->
+    <div class="app" id="app">
+
+        <!-- ============================================
+        DUEL ARENA
+        ============================================ -->
+        <div class="duel-arena" id="duelArena">
+            
+            <!-- Top Bar -->
+            <div class="topbar">
+                <div class="profile" onclick="toggleLogin()">
+                    <div class="avatar" id="avatarDisplay">👤</div>
+                    <span class="username" id="usernameDisplay">guest</span>
+                </div>
+                <div class="room-controls">
+                    <button onclick="toggleRooms()">rooms ▼</button>
+                    <button onclick="toggleChat()" id="chatToggle">chat</button>
+                </div>
+            </div>
+
+            <!-- Rooms Dropdown -->
+            <div class="rooms-dropdown" id="roomsDropdown">
+                <div class="room-item" onclick="joinRoom('general')"># general</div>
+                <div class="room-item" onclick="joinRoom('market')"># market</div>
+                <div class="room-item" onclick="joinRoom('show-and-tell')"># show-and-tell</div>
+            </div>
+
+            <!-- Duel Container -->
+            <div class="duel-container" id="duelContainer">
+                <!-- Rendered by JS -->
+            </div>
+
+            <!-- Ticker -->
+            <div class="ticker" id="ticker">
+                <marquee behavior="scroll" direction="left" scrollamount="3">
+                    🏆 so overso • where products duel • vote now • check back daily • 
+                </marquee>
             </div>
         </div>
 
-        <div id="leaderboard" class="screen">
-            <h2 style="color: #00ffff; margin-bottom: 20px;">TOP PRODUCTS THIS WEEK</h2>
-            <table class="leaderboard-table">
-                <thead>
-                    <tr>
-                        <th>RANK</th>
-                        <th>PRODUCT</th>
-                        <th>MERCHANT</th>
-                        <th>WINS</th>
-                        <th>WIN RATE</th>
-                    </tr>
-                </thead>
-                <tbody id="leaderboardBody"></tbody>
-            </table>
-        </div>
-
-        <div id="merchant" class="screen">
-            <h2 style="color: #00ffff; margin-bottom: 20px;">MERCHANT DASHBOARD</h2>
-            <div class="dashboard" id="dashboardStats"></div>
-            <div style="margin-top: 40px;">
-                <h3 style="color: #ff00ff; margin-bottom: 20px;">CREATE NEW DUEL</h3>
-                <div class="login-form">
-                    <div class="form-group">
-                        <label>Product 1 Name</label>
-                        <input type="text" id="prod1Name" placeholder="Your product name">
-                    </div>
-                    <div class="form-group">
-                        <label>Product 1 Price</label>
-                        <input type="text" id="prod1Price" placeholder="$19.99">
-                    </div>
-                    <div class="form-group">
-                        <label>Product 2 Name</label>
-                        <input type="text" id="prod2Name" placeholder="Your product name">
-                    </div>
-                    <div class="form-group">
-                        <label>Product 2 Price</label>
-                        <input type="text" id="prod2Price" placeholder="$29.99">
-                    </div>
-                    <button class="login-btn" onclick="createDuel()">CREATE DUEL</button>
-                </div>
+        <!-- ============================================
+        CHAT PANEL
+        ============================================ -->
+        <div class="chat-panel" id="chatPanel">
+            <div class="chat-header">💬 chat</div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="chat-message"><span class="msg-user">system:</span> welcome to so overso</div>
             </div>
-        </div>
-
-        <div id="login" class="screen">
-            <div class="login-form">
-                <h2 style="color: #00ffff; margin-bottom: 30px;">JOIN SO OVER SO</h2>
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" id="username" placeholder="Your handle">
-                </div>
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="email" placeholder="your@email.com">
-                </div>
-                <div class="form-group">
-                    <label>I am a...</label>
-                    <select id="userType">
-                        <option value="shopper">Shopper</option>
-                        <option value="merchant">Merchant</option>
-                        <option value="community">Community Builder</option>
-                    </select>
-                </div>
-                <button class="login-btn" onclick="login()">ENTER</button>
+            <div class="chat-input">
+                <input type="text" id="chatInput" placeholder="say something..." onkeydown="if(event.key==='Enter')sendChat()">
+                <button onclick="sendChat()">send</button>
             </div>
         </div>
     </div>
 
-    <div id="paymentModal" class="payment-modal">
-        <div class="payment-content">
-            <h2>CHOOSE PAYMENT METHOD</h2>
-            <div class="payment-method" onclick="selectPayment('stripe')">💳 STRIPE</div>
-            <div class="payment-method" onclick="selectPayment('paypal')">🔵 PAYPAL</div>
-            <div class="payment-method" onclick="selectPayment('crypto')">₿ CRYPTO</div>
-            <div class="payment-method" onclick="selectPayment('tg')">✈️ TELEGRAM PAY</div>
-            <div id="qrcode" style="display:none;"></div>
-            <p id="paymentInfo" style="color: #00ff00; margin-top: 20px; display: none;"></p>
-            <button class="close-payment" onclick="closePayment()">CLOSE</button>
+    <!-- ============================================
+    LOGIN OVERLAY
+    ============================================ -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-box">
+            <h2>come in</h2>
+            <div class="form-group">
+                <label>username</label>
+                <input type="text" id="loginUsername" placeholder="your handle">
+            </div>
+            <div class="form-group">
+                <label>email</label>
+                <input type="email" id="loginEmail" placeholder="your@email.com">
+            </div>
+            <div class="form-group">
+                <label>i am a...</label>
+                <select id="loginType">
+                    <option value="shopper">shopper</option>
+                    <option value="merchant">merchant</option>
+                    <option value="community">community builder</option>
+                </select>
+            </div>
+            <button class="login-btn" onclick="handleLogin()">enter</button>
+            <div class="close-login" onclick="toggleLogin()">maybe later</div>
         </div>
     </div>
 
-    <script>
-        let currentUser = null;
-        let currentDuel = null;
-        const SAMPLE_DUELS = [
-            { id: 1, prod1: { name: 'Indie Widget', price: '$19.99', merchant: 'TechStarter', wins: 234 }, prod2: { name: 'Competitor Tool', price: '$24.99', merchant: 'BuildCo', wins: 189 } },
-            { id: 2, prod1: { name: 'Design Course', price: '$99', merchant: 'CreativeFlow', wins: 156 }, prod2: { name: 'Tutorial Pack', price: '$79', merchant: 'LearnFast', wins: 198 } },
-            { id: 3, prod1: { name: 'API Service', price: '$49/mo', merchant: 'DevShop', wins: 312 }, prod2: { name: 'Integration Tool', price: '$39/mo', merchant: 'ConnectNow', wins: 267 } },
-        ];
-
-        function init() {
-            loadUser();
-            setupNavigation();
-            loadDuel();
-            updateLeaderboard();
-        }
-
-        function setupNavigation() {
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    if (e.target.dataset.screen) {
-                        switchScreen(e.target.dataset.screen);
-                        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-                        e.target.classList.add('active');
-                        if (e.target.dataset.screen === 'merchant') updateDashboardStats();
-                    }
-                });
-            });
-        }
-
-        function switchScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
-            if (screenId === 'merchant' && !currentUser) {
-                showAlert('Login as merchant first', 'error');
-                switchScreen('login');
-            }
-        }
-
-        function login() {
-            const username = document.getElementById('username').value.trim();
-            const email = document.getElementById('email').value.trim();
-            const userType = document.getElementById('userType').value;
-
-            if (!username || !email) {
-                showAlert('Username and email required', 'error');
-                return;
-            }
-
-            const user = { username, email, userType, joinedAt: new Date() };
-            currentUser = user;
-            localStorage.setItem('sooverso_user', JSON.stringify(user));
-            showAlert(`Welcome, ${username}!`, 'success');
-            updateUserGreeting();
-            switchScreen('duel');
-        }
-
-        function loadUser() {
-            const saved = localStorage.getItem('sooverso_user');
-            if (saved) currentUser = JSON.parse(saved);
-            updateUserGreeting();
-        }
-
-        function logout() {
-            currentUser = null;
-            localStorage.removeItem('sooverso_user');
-            updateUserGreeting();
-            switchScreen('duel');
-        }
-
-        function updateUserGreeting() {
-            const greeting = document.getElementById('userGreeting');
-            if (currentUser) {
-                greeting.textContent = `Logged in as ${currentUser.username} [${currentUser.userType.toUpperCase()}]`;
-            } else {
-                greeting.textContent = 'Not logged in • Login to vote and earn rewards';
-            }
-        }
-
-        function loadDuel() {
-            currentDuel = SAMPLE_DUELS[Math.floor(Math.random() * SAMPLE_DUELS.length)];
-            renderDuel();
-        }
-
-        function renderDuel() {
-            if (!currentDuel) return;
-            const container = document.getElementById('duelContainer');
-            const { prod1, prod2 } = currentDuel;
-            container.innerHTML = `
-                <div class="product-card" onclick="voteDuel(1)">
-                    <div class="merchant-badge">${prod1.merchant}</div>
-                    <div class="product-img">🏆</div>
-                    <div class="product-name">${prod1.name}</div>
-                    <div class="product-price">${prod1.price}</div>
-                    <div class="product-desc">wins: <strong>${prod1.wins}</strong></div>
-                    <button class="vote-btn">PICK THIS</button>
-                </div>
-                <div class="product-card" onclick="voteDuel(2)">
-                    <div class="merchant-badge">${prod2.merchant}</div>
-                    <div class="product-img">⚡</div>
-                    <div class="product-name">${prod2.name}</div>
-                    <div class="product-price">${prod2.price}</div>
-                    <div class="product-desc">wins: <strong>${prod2.wins}</strong></div>
-                    <button class="vote-btn">PICK THIS</button>
-                </div>
-            `;
-        }
-
-        function voteDuel(productNum) {
-            if (!currentUser) {
-                showAlert('Login to vote', 'info');
-                return;
-            }
-            const winner = productNum === 1 ? currentDuel.prod1 : currentDuel.prod2;
-            currentDuel[`prod${productNum}`].wins += 1;
-            openPayment();
-            showAlert(`You picked ${winner.name}! 3-click checkout ready.`, 'success');
-            setTimeout(() => { loadDuel(); }, 2000);
-        }
-
-        function openPayment() {
-            document.getElementById('paymentModal').classList.add('active');
-        }
-
-        function closePayment() {
-            document.getElementById('paymentModal').classList.remove('active');
-            document.getElementById('qrcode').innerHTML = '';
-            document.getElementById('qrcode').style.display = 'none';
-        }
-
-        function selectPayment(method) {
-            document.querySelectorAll('.payment-method').forEach(m => m.classList.remove('active'));
-            event.target.closest('.payment-method').classList.add('active');
-            const qrcodeDiv = document.getElementById('qrcode');
-            qrcodeDiv.innerHTML = '';
-            qrcodeDiv.style.display = 'block';
-            const paymentUrls = {
-                stripe: 'https://stripe.com/pay/sooverso',
-                paypal: 'https://paypal.me/sooverso',
-                crypto: 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq',
-                tg: 'https://t.me/sooverso_bot?start=payment'
-            };
-            new QRCode(qrcodeDiv, { text: paymentUrls[method], width: 200, height: 200, colorDark: '#00ffff', colorLight: '#1a1f3a' });
-            document.getElementById('paymentInfo').style.display = 'block';
-            document.getElementById('paymentInfo').textContent = `Scan to pay via ${method.toUpperCase()} • 3 clicks to checkout`;
-        }
-
-        function createDuel() {
-            if (!currentUser || currentUser.userType !== 'merchant') {
-                showAlert('Merchant only', 'error');
-                return;
-            }
-            const p1 = document.getElementById('prod1Name').value;
-            const p2 = document.getElementById('prod2Name').value;
-            const pr1 = document.getElementById('prod1Price').value;
-            const pr2 = document.getElementById('prod2Price').value;
-            if (!p1 || !p2 || !pr1 || !pr2) {
-                showAlert('All fields required', 'error');
-                return;
-            }
-            const newDuel = {
-                id: SAMPLE_DUELS.length + 1,
-                prod1: { name: p1, price: pr1, merchant: currentUser.username, wins: 0 },
-                prod2: { name: p2, price: pr2, merchant: currentUser.username, wins: 0 }
-            };
-            SAMPLE_DUELS.push(newDuel);
-            showAlert(`Duel created! Waiting for votes.`, 'success');
-            document.querySelectorAll('.login-form input').forEach(i => i.value = '');
-        }
-
-        function updateDashboardStats() {
-            if (!currentUser || currentUser.userType !== 'merchant') return;
-            const stats = {
-                activeDuels: Math.floor(Math.random() * 5) + 1,
-                totalVotes: Math.floor(Math.random() * 500) + 100,
-                conversions: Math.floor(Math.random() * 50) + 10,
-                earnings: `$${(Math.random() * 500 + 100).toFixed(2)}`
-            };
-            document.getElementById('dashboardStats').innerHTML = `
-                <div class="stat-box"><div class="stat-number">${stats.activeDuels}</div><div class="stat-label">Active Duels</div></div>
-                <div class="stat-box"><div class="stat-number">${stats.totalVotes}</div><div class="stat-label">Total Votes</div></div>
-                <div class="stat-box"><div class="stat-number">${stats.conversions}</div><div class="stat-label">Conversions</div></div>
-                <div class="stat-box"><div class="stat-number" style="color: #00ff00;">${stats.earnings}</div><div class="stat-label">Earnings</div></div>
-            `;
-        }
-
-        function updateLeaderboard() {
-            const sorted = SAMPLE_DUELS.map((d, i) => ({
-                rank: i + 1,
-                product: d.prod1.name,
-                merchant: d.prod1.merchant,
-                wins: d.prod1.wins
-            })).sort((a, b) => b.wins - a.wins);
-            const tbody = document.getElementById('leaderboardBody');
-            tbody.innerHTML = sorted.map(item => `
-                <tr>
-                    <td><span class="rank-badge">${item.rank}</span></td>
-                    <td>${item.product}</td>
-                    <td>${item.merchant}</td>
-                    <td>${item.wins}</td>
-                    <td>${((item.wins / 100) * 100).toFixed(1)}%</td>
-                </tr>
-            `).join('');
-        }
-
-        function showAlert(msg, type) {
-            const alerts = document.getElementById('alerts');
-            const alert = document.createElement('div');
-            alert.className = `alert ${type}`;
-            alert.textContent = msg;
-            alerts.appendChild(alert);
-            setTimeout(() => alert.remove(), 3000);
-        }
-
-        init();
-    </script>
-</body>
-</html>
+    <!-- ============================================
+    PAYMENT MODAL
+    ============================================ -->
+    <div class="payment-modal" id="paymentModal">
+        <div class="payment-box">
+            <h2>⚡ 3-click checkout</h2>
+            <div class="pay-method" onclick="selectPayment('stripe')">💳 stripe</div>
+            <div class="pay-method" onclick="selectPayment('paypal')">🔵 pay
+```
